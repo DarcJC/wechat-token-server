@@ -41,7 +41,7 @@ def fetch_wechat_token() -> BadResponse or str:
     }).json()
     data = try_parse(resp)
     if isinstance(data, GoodResponse):
-        redis_instance.set(key, data.access_token)
+        redis_instance.set(key, data.access_token, settings.EXPIRE_SECS)
         return data.access_token
     else:
         return data
