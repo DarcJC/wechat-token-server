@@ -1,0 +1,7 @@
+fastapi~=0.66.0
+pydantic~=1.8.2
+requests~=2.26.0
+python-multipart~=0.0.5
+starlette~=0.14.2
+uvicorn[standard]
+redis~=3.5.3

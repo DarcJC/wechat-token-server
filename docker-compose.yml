@@ -1,0 +1,22 @@
+version: "3"
+
+services:
+  redis:
+    image: redis:6.0-alpine
+    container_name: wx-token-redis
+    restart: unless-stopped
+  token-server:
+    image: darcjc/wechat-token:latest
+    container_name: wx-token-server
+    depends_on:
+      - redis
+    environment:
+      - WECHAT_APPID
+      - WECHAT_SECRET
+      - SERVER_SECRET
+      - REDIS_DSN
+      - EXPIRE_SECS
+      - SERVER_HOST
+      - SERVER_PORT
+    ports:
+      - "${SERVER_PORT:-8866}:8866"
