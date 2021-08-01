@@ -14,7 +14,7 @@ services:
       - WECHAT_APPID
       - WECHAT_SECRET
       - SERVER_SECRET
-      - REDIS_DSN
+      - "REDIS_DSN=redis://redis"
       - EXPIRE_SECS
       - SERVER_HOST
       - SERVER_PORT
