@@ -32,7 +32,7 @@ def try_parse(obj):
 def fetch_wechat_token() -> BadResponse or str:
     key = "data::wechat_access_token"
     cache = redis_instance.get(key)
-    if isinstance(cache, str):
+    if cache is not None:
         return cache
     resp = requests.get("https://api.weixin.qq.com/cgi-bin/token", params={
         "grant_type": "client_credential",
