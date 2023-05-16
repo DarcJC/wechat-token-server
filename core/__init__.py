@@ -132,7 +132,7 @@ async def js_sdk_signature(url: constr(min_length=1)):
     sign_body = dict(sorted({
         "noncestr":
             ''.join(random.SystemRandom().choice(string.ascii_uppercase + string.digits) for _ in range(16)),
-        "jsapi_ticket": await fetch_js_ticket_token(),
+        "jsapi_ticket": (await fetch_js_ticket_token()).ticket,
         "timestamp": int(time.time()),
         "url": url,
     }.items()))
