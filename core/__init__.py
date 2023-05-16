@@ -74,7 +74,7 @@ async def fetch_js_ticket_token() -> TicketResponse:
             "token": token,
             "type": "jsapi",
         }) as resp:
-            data = parse_obj_as(await resp.json(), TicketResponse)
+            data = parse_obj_as(TicketResponse, await resp.json())
             await redis_instance.set(key, data.ticket, settings.EXPIRE_SECS)
             return data
 
