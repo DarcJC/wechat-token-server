@@ -6,17 +6,18 @@ services:
     container_name: wx-token-redis
     restart: unless-stopped
   token-server:
-    image: darcjc/wechat-token:latest
+    #image: darcjc/wechat-token:latest
+    build: .
     container_name: wx-token-server
     depends_on:
       - redis
+    env_file:
+      - .env
     environment:
       - WECHAT_APPID
       - WECHAT_SECRET
       - SERVER_SECRET
       - "REDIS_DSN=redis://redis"
       - EXPIRE_SECS
-      - SERVER_HOST
-      - SERVER_PORT
     ports:
       - "${SERVER_PORT:-8866}:8866"

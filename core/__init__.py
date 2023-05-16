@@ -1,15 +1,23 @@
 from typing import Optional, Callable
 
-import requests
+import aioredis
+import aiohttp
+from typing import Literal
 from fastapi import FastAPI
 from pydantic import conint, constr, BaseModel, parse_obj_as, ValidationError
-from redis import from_url
+from aioredis import from_url
 from starlette.responses import JSONResponse
 
 from core.settings import settings
 
 app = FastAPI()
-redis_instance = from_url(settings.REDIS_DSN)
+redis_instance: aioredis.Redis = None
+
+
+@app.on_event("startup")
+async def startup():
+    global redis_instance
+    redis_instance = await from_url(settings.REDIS_DSN)
 
 
 class BadResponse(BaseModel):
@@ -22,6 +30,13 @@ class GoodResponse(BaseModel):
     expires_in: int
 
 
+class TicketResponse(BaseModel):
+    errcode: int
+    errmsg: Literal['ok'] or str
+    ticket: str
+    expires_in: int
+
+
 def try_parse(obj):
     try:
         return parse_obj_as(GoodResponse, obj)
@@ -29,22 +44,39 @@ def try_parse(obj):
         return parse_obj_as(BadResponse, obj)
 
 
-def fetch_wechat_token() -> BadResponse or str:
+async def fetch_wechat_token() -> BadResponse or str:
     key = "data::wechat_access_token"
-    cache = redis_instance.get(key)
+    cache = await redis_instance.get(key)
     if cache is not None:
         return cache
-    resp = requests.get("https://api.weixin.qq.com/cgi-bin/token", params={
-        "grant_type": "client_credential",
-        "appid": settings.WECHAT_APPID,
-        "secret": settings.WECHAT_SECRET,
-    }).json()
-    data = try_parse(resp)
-    if isinstance(data, GoodResponse):
-        redis_instance.set(key, data.access_token, settings.EXPIRE_SECS)
-        return data.access_token
-    else:
-        return data
+    async with aiohttp.ClientSession() as session:
+        async with session.get("https://api.weixin.qq.com/cgi-bin/token", params={
+            "grant_type": "client_credential",
+            "appid": settings.WECHAT_APPID,
+            "secret": settings.WECHAT_SECRET,
+        }) as resp:
+            data = try_parse(await resp.json())
+            if isinstance(data, GoodResponse):
+                await redis_instance.set(key, data.access_token, settings.EXPIRE_SECS)
+                return data.access_token
+            else:
+                return data
+
+
+async def fetch_js_ticket_token() -> TicketResponse:
+    key = "data::wechat_js_ticket_token"
+    cache = await redis_instance.get(key)
+    if cache is not None:
+        return cache
+    token = await fetch_wechat_token()
+    async with aiohttp.ClientSession() as session:
+        async with session.get("https://api.weixin.qq.com/cgi-bin/ticket/getticket?access_token=", params={
+            "token": token,
+            "type": "jsapi",
+        }) as resp:
+            data = parse_obj_as(await resp.json(), TicketResponse)
+            await redis_instance.set(key, data.ticket, settings.EXPIRE_SECS)
+            return data
 
 
 class TokenResponse(BaseModel):
@@ -55,17 +87,25 @@ class ForbiddenResponse(BaseModel):
     detail: str
 
 
-@app.get("/{token}", response_model=TokenResponse, responses={
+@app.get("/access_token/{token}", response_model=TokenResponse, responses={
     404: {"model": BadResponse},
     403: {"model": ForbiddenResponse}
 })
-def get_token(token: constr(min_length=1)):
+async def get_token(token: constr(min_length=1)):
     if token != settings.SERVER_SECRET:
         return JSONResponse({"detail": "bad token"}, 403)
-    data = fetch_wechat_token()
+    data = await fetch_wechat_token()
     if isinstance(data, BadResponse):
         return JSONResponse(data.json(), 404)
     return TokenResponse(token=data)
+
+
+@app.get("/js_ticket/{token}", response_model=TokenResponse)
+async def get_js_ticket(token: constr(min_length=1)):
+    if token != settings.SERVER_SECRET:
+        return JSONResponse({"detail": "bad token"}, 403)
+    data = await fetch_js_ticket_token()
+    return TokenResponse(token=data.ticket)
 
 
 @app.on_event("shutdown")
