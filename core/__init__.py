@@ -136,7 +136,7 @@ async def js_sdk_signature(url: constr(min_length=1)):
         "timestamp": int(time.time()),
         "url": url,
     }.items()))
-    sign_str = '&'.join([f"{k}={v}" for k, v in sign_body.items()])[:-1]
+    sign_str = '&'.join([f"{k}={v}" for k, v in sign_body.items()])
     sign = hashlib.sha1(sign_str.encode("utf-8")).hexdigest()
     return SignatureResponse(signature=sign, nonce=sign_body["noncestr"], timestamp=sign_body["timestamp"])
 
