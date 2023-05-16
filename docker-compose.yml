@@ -19,5 +19,6 @@ services:
       - SERVER_SECRET
       - "REDIS_DSN=redis://redis"
       - EXPIRE_SECS
+      - DOMAIN_WHITELIST
     ports:
       - "${SERVER_PORT:-8866}:8866"

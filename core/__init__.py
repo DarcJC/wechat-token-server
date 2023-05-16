@@ -1,8 +1,12 @@
+import hashlib
+import time
 from typing import Optional, Callable
 
 import aioredis
 import aiohttp
-from typing import Literal
+import random
+import string
+from typing import Literal, Optional
 from fastapi import FastAPI
 from pydantic import conint, constr, BaseModel, parse_obj_as, ValidationError
 from aioredis import from_url
@@ -32,7 +36,7 @@ class GoodResponse(BaseModel):
 
 class TicketResponse(BaseModel):
     errcode: int
-    errmsg: Literal['ok'] or str
+    errmsg: str
     ticket: str
     expires_in: int
 
@@ -71,7 +75,7 @@ async def fetch_js_ticket_token() -> TicketResponse:
     token = await fetch_wechat_token()
     async with aiohttp.ClientSession() as session:
         async with session.get("https://api.weixin.qq.com/cgi-bin/ticket/getticket?access_token=", params={
-            "token": token,
+            "access_token": token,
             "type": "jsapi",
         }) as resp:
             data = parse_obj_as(TicketResponse, await resp.json())
@@ -81,6 +85,12 @@ async def fetch_js_ticket_token() -> TicketResponse:
 
 class TokenResponse(BaseModel):
     token: str
+
+
+class SignatureResponse(BaseModel):
+    signature: str
+    nonce: str
+    timestamp: int
 
 
 class ForbiddenResponse(BaseModel):
@@ -106,6 +116,27 @@ async def get_js_ticket(token: constr(min_length=1)):
         return JSONResponse({"detail": "bad token"}, 403)
     data = await fetch_js_ticket_token()
     return TokenResponse(token=data.ticket)
+
+
+@app.get("/js_sdk/signature", response_model=SignatureResponse)
+async def js_sdk_signature(url: constr(min_length=1)):
+    # get domain from url
+    url_split = url.split("/")
+    if len(url_split) < 3:
+        return JSONResponse({"detail": "bad url"}, 403)
+    domain = url_split[2]
+    if domain not in settings.DOMAIN_WHITELIST:
+        return JSONResponse({"detail": "domain isn't in whitelist"}, 403)
+    sign_body = dict(sorted({
+        "noncestr":
+            ''.join(random.SystemRandom().choice(string.ascii_uppercase + string.digits) for _ in range(16)),
+        "jsapi_ticket": await fetch_js_ticket_token(),
+        "timestamp": int(time.time()),
+        "url": url,
+    }.items()))
+    sign_str = ''.join([f"{k}={v}&" for k, v in sign_body.items()])[:-1]
+    sign = hashlib.sha1(sign_str.encode("utf-8")).hexdigest()
+    return SignatureResponse(signature=sign, nonce=sign_body["noncestr"], timestamp=sign_body["timestamp"])
 
 
 @app.on_event("shutdown")

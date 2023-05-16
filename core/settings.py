@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Optional, List
 
 from pydantic import BaseSettings, RedisDsn, conint
 
@@ -11,6 +11,7 @@ class Settings(BaseSettings):
     EXPIRE_SECS: Optional[conint(ge=1)] = 3600
     SERVER_HOST: Optional[str] = "0.0.0.0"
     SERVER_PORT: Optional[int] = 8866
+    DOMAIN_WHITELIST: Optional[List[str]] = ["localhost"]
 
     class Config:
         env_file = ".env"
