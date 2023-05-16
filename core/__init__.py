@@ -74,7 +74,7 @@ async def fetch_js_ticket_token() -> TicketResponse:
         return cache
     token = await fetch_wechat_token()
     async with aiohttp.ClientSession() as session:
-        async with session.get("https://api.weixin.qq.com/cgi-bin/ticket/getticket?access_token=", params={
+        async with session.get("https://api.weixin.qq.com/cgi-bin/ticket/getticket", params={
             "access_token": token,
             "type": "jsapi",
         }) as resp:
