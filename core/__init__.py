@@ -52,7 +52,7 @@ async def fetch_wechat_token() -> BadResponse or str:
     key = "data::wechat_access_token"
     cache = await redis_instance.get(key)
     if cache is not None:
-        return cache
+        return cache.decode()
     async with aiohttp.ClientSession() as session:
         async with session.get("https://api.weixin.qq.com/cgi-bin/token", params={
             "grant_type": "client_credential",
@@ -71,7 +71,7 @@ async def fetch_js_ticket_token() -> TicketResponse:
     key = "data::wechat_js_ticket_token"
     cache = await redis_instance.get(key)
     if cache is not None:
-        return cache
+        return TicketResponse(ticket=cache.decode(), errcode=0, errmsg="ok", expires_in="0")
     token = await fetch_wechat_token()
     if type(token) == 'bytes':
         token = token.decode()
